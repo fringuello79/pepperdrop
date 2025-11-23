@@ -384,6 +384,9 @@
     const WIDTH = canvas.width;
     const HEIGHT = canvas.height;
 
+    // URL Apps Script per leaderboard globale
+    const API_URL = "https://script.google.com/macros/s/AKfycbzqilmWvZkHd_y8VAZ2XzkSnY3CbNGHQ5WW7TfApsynQahh2YQQqZ5R723Vwf71xTEzMw/exec";
+
     let gameStarted = false;
     let hasPlayedIntro = false;
 
@@ -578,22 +581,27 @@
     window.addEventListener("keydown", initAudio, { once: true });
     canvas.addEventListener("touchstart", initAudio, { once: true });
 
-    function loadLeaderboard() {
-      try {
-        const data = localStorage.getItem("pepperDropLeaderboard");
-        if (data) {
-          leaderboard = JSON.parse(data);
-        }
-      } catch (e) {
-        leaderboard = [];
-      }
-      renderLeaderboard();
-    }
+    // --- LEADERBOARD REMOTA ---
 
-    function saveLeaderboard() {
+    async function loadLeaderboard() {
+      // Provo prima a prendere i dati dall'API condivisa
       try {
-        localStorage.setItem("pepperDropLeaderboard", JSON.stringify(leaderboard));
-      } catch (e) {}
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json(); // [{name, score}, ...]
+        leaderboard = Array.isArray(data) ? data : [];
+      } catch (err) {
+        console.error("Errore leaderboard remota, uso eventuale cache locale:", err);
+        // fallback: classifica locale sul singolo browser
+        try {
+          const local = localStorage.getItem("pepperDropLeaderboard");
+          leaderboard = local ? JSON.parse(local) : [];
+        } catch (e) {
+          leaderboard = [];
+        }
+      }
+
+      renderLeaderboard();
     }
 
     function renderLeaderboard() {
@@ -612,7 +620,7 @@
         });
     }
 
-    function onGameOver() {
+    async function onGameOver() {
       let msgPrompt;
       if (score === 0) {
         msgPrompt = "GAME OVER! Hai preso zero. Vuoi davvero finire in classifica? 😬";
@@ -631,12 +639,35 @@
       if (!name) {
         name = "si vergogna di inserire il nome";
       }
+
+      // aggiorno subito la leaderboard in memoria
       leaderboard.push({ name, score });
       leaderboard.sort((a, b) => b.score - a.score);
       leaderboard = leaderboard.slice(0, 10);
-      saveLeaderboard();
+
+      // cache locale
+      try {
+        localStorage.setItem("pepperDropLeaderboard", JSON.stringify(leaderboard));
+      } catch (e) {}
+
       renderLeaderboard();
+
+      // invio al server condiviso
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, score })
+        });
+      } catch (err) {
+        console.error("Errore nell'invio del punteggio all'API:", err);
+      }
+
+      // ricarico la leaderboard dal server (aggiornata)
+      loadLeaderboard();
     }
+
+    // --- INPUT & GIOCO ---
 
     window.addEventListener("keydown", (e) => {
       if (e.key === "ArrowLeft") keys.left = true;
@@ -1355,7 +1386,6 @@
               objects.splice(i, 1);
               continue;
             } else {
-              // peperoncini buoni
               if (o.type === "scorpion_yellow") {
                 score += 2;
                 playEatYellowSound();
