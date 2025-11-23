@@ -2,6 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pepper Drop – Bocca di Fuoco</title>
   <style>
     html, body {
@@ -101,11 +102,11 @@
       background: #333;
     }
 
-    /* Controlli mobile grandi in basso */
+    /* Controlli mobile grandi in basso – SEMPRE visibili */
     .mobile-controls {
       margin-top: 6px;
       width: 480px;
-      display: none; /* visibili solo su schermi piccoli */
+      display: flex;
       justify-content: space-between;
       gap: 8px;
     }
@@ -124,12 +125,6 @@
 
     .mobile-btn:active {
       background: #333;
-    }
-
-    @media (max-width: 600px) {
-      .mobile-controls {
-        display: flex;
-      }
     }
 
     #leaderboard {
@@ -174,7 +169,7 @@
       color: rgba(245, 245, 245, 0.65);
     }
 
-    /* Iconcine “emoticon” stile sprite per i peperoncini e il latte */
+    /* Iconcine sprite peperoncini + latte */
     .icon-pepper {
       display: inline-block;
       width: 12px;
