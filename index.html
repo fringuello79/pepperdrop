@@ -653,22 +653,19 @@
       renderLeaderboard();
 
       // invio al server condiviso
-     // invio al server condiviso (come form, compatibile con e.parameter)
-try {
-  const body = new URLSearchParams();
-  body.append("name", name);
-  body.append("score", String(score));
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, score })
+        });
+      } catch (err) {
+        console.error("Errore nell'invio del punteggio all'API:", err);
+      }
 
-  await fetch(API_URL, {
-    method: "POST",
-    body
-  });
-
-  console.log("Punteggio inviato all'API");
-} catch (err) {
-  console.error("Errore nell'invio del punteggio all'API:", err);
-}
-
+      // ricarico la leaderboard dal server (aggiornata)
+      loadLeaderboard();
+    }
 
     // --- INPUT & GIOCO ---
 
