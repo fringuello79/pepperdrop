@@ -620,8 +620,7 @@
         });
     }
 
-    async 
-async function onGameOver() {
+    async function onGameOver() {
       let msgPrompt;
       if (score === 0) {
         msgPrompt = "GAME OVER! Hai preso zero. Vuoi davvero finire in classifica? 😬";
@@ -641,7 +640,7 @@ async function onGameOver() {
         name = "si vergogna di inserire il nome";
       }
 
-      // aggiorna leaderboard locale
+      // aggiorno subito la leaderboard in memoria
       leaderboard.push({ name, score });
       leaderboard.sort((a, b) => b.score - a.score);
       leaderboard = leaderboard.slice(0, 10);
@@ -653,26 +652,223 @@ async function onGameOver() {
 
       renderLeaderboard();
 
-      // invia punteggio al server condiviso come form (compatibile con Apps Script)
-      try {
-        const body = new URLSearchParams();
-        body.append("name", name);
-        body.append("score", String(score));
+      // invio al server condiviso
+     // invio al server condiviso (come form, compatibile con e.parameter)
+try {
+  const body = new URLSearchParams();
+  body.append("name", name);
+  body.append("score", String(score));
 
-        await fetch(API_URL, {
-          method: "POST",
-          body
+  await fetch(API_URL, {
+    method: "POST",
+    body
+  });
+
+  console.log("Punteggio inviato all'API");
+} catch (err) {
+  console.error("Errore nell'invio del punteggio all'API:", err);
+}
+
+
+    // --- INPUT & GIOCO ---
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") keys.left = true;
+      if (e.key === "ArrowRight") keys.right = true;
+
+      if (gameOver && e.key === " ") {
+        if (audioCtx) playStartMusic();
+        restartGame();
+      }
+    });
+
+    window.addEventListener("keyup", (e) => {
+      if (e.key === "ArrowLeft") keys.left = false;
+      if (e.key === "ArrowRight") keys.right = false;
+    });
+
+    function handleTouch(e) {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      if (!touch) return;
+      const x = touch.clientX - rect.left;
+
+      if (x < rect.width / 2) {
+        keys.left = true;
+        keys.right = false;
+      } else {
+        keys.right = true;
+        keys.left = false;
+      }
+    }
+
+    function endTouch(e) {
+      e.preventDefault();
+      keys.left = false;
+      keys.right = false;
+    }
+
+    canvas.addEventListener("touchstart", handleTouch, { passive: false });
+    canvas.addEventListener("touchmove", handleTouch, { passive: false });
+    canvas.addEventListener("touchend", endTouch, { passive: false });
+    canvas.addEventListener("touchcancel", endTouch, { passive: false });
+
+    function pressLeft(e) {
+      e.preventDefault();
+      keys.left = true;
+      keys.right = false;
+    }
+
+    function releaseLeft(e) {
+      e.preventDefault();
+      keys.left = false;
+    }
+
+    function pressRight(e) {
+      e.preventDefault();
+      keys.right = true;
+      keys.left = false;
+    }
+
+    function releaseRight(e) {
+      e.preventDefault();
+      keys.right = false;
+    }
+
+    if (btnLeft && btnRight) {
+      btnLeft.addEventListener("touchstart", pressLeft, { passive: false });
+      btnLeft.addEventListener("touchend", releaseLeft, { passive: false });
+      btnLeft.addEventListener("touchcancel", releaseLeft, { passive: false });
+
+      btnRight.addEventListener("touchstart", pressRight, { passive: false });
+      btnRight.addEventListener("touchend", releaseRight, { passive: false });
+      btnRight.addEventListener("touchcancel", releaseRight, { passive: false });
+
+      btnLeft.addEventListener("mousedown", pressLeft);
+      btnLeft.addEventListener("mouseup", releaseLeft);
+      btnLeft.addEventListener("mouseleave", releaseLeft);
+
+      btnRight.addEventListener("mousedown", pressRight);
+      btnRight.addEventListener("mouseup", releaseRight);
+      btnRight.addEventListener("mouseleave", releaseRight);
+    }
+
+    btnRestart.addEventListener("click", () => {
+      if (!gameStarted) return;
+      if (audioCtx) playStartMusic();
+      restartGame();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    btnStart.addEventListener("click", () => {
+      initAudio();
+      if (!hasPlayedIntro && audioCtx) {
+        playStartMusic();
+        hasPlayedIntro = true;
+      } else if (audioCtx) {
+        playStartMusic();
+      }
+      gameStarted = true;
+      btnStart.style.display = "none";
+      restartGame();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    function restartGame() {
+      score = 0;
+      objects.length = 0;
+      spawnTimer = 0;
+      spawnInterval = 55;
+      gameOver = false;
+      lastDeathByReaper = false;
+      explosionFrame = 0;
+      pendingNamePrompt = false;
+      player.x = WIDTH / 2 - player.w / 2;
+      player.armPhase = 0;
+      player.moving = false;
+      keys.left = false;
+      keys.right = false;
+      devilStage = 0;
+      prevDevilStage = 0;
+      milkShields = 0;
+      chewTimer = 0;
+      statusEl.textContent = "";
+      updateHUD();
+    }
+
+    function random(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    function spawnObject() {
+      if (score >= 50 && Math.random() < 0.005) {
+        const size = 14;
+        objects.push({
+          x: random(10, WIDTH - 10 - size),
+          y: -size,
+          w: size,
+          h: size * 1.4,
+          speedY: random(3.5, 4.5) + score * 0.03,
+          type: "milk"
         });
-
-        console.log("Punteggio inviato all'API");
-      } catch (err) {
-        console.error("Errore nell'invio del punteggio all'API:", err);
+        return;
       }
 
-      // ricarica la leaderboard dal server (dati condivisi)
-      loadLeaderboard();
+      const r = Math.random();
+      let type;
+
+      if (r < 0.15) {
+        type = "habanero";
+      } else if (r < 0.30) {
+        type = "habanero_orange";
+      } else if (r < 0.45) {
+        type = "scorpion";
+      } else if (r < 0.60) {
+        type = "sevenpot";
+      } else if (r < 0.74) {
+        type = "habanero_choc";
+      } else if (r < 0.84) {
+        type = "scorpion_yellow";
+      } else {
+        type = "reaper";
+      }
+
+      const size = 14;
+      objects.push({
+        x: random(10, WIDTH - 10 - size),
+        y: -size,
+        w: size,
+        h: size * 1.6,
+        speedY: random(1.8, 2.6) + score * 0.03,
+        type: type
+      });
     }
-function updateDevilStage() {
+
+    function rectsCollide(a, b) {
+      return !(
+        a.x + a.w < b.x ||
+        a.x > b.x + b.w ||
+        a.y + a.h < b.y ||
+        a.y > b.y + b.h
+      );
+    }
+
+    function getLevel() {
+      if (score < 5) return 0;
+      if (score < 10) return 1;
+      if (score < 20) return 2;
+      return 3;
+    }
+
+    function computeDevilStageFromScore(score) {
+      if (score >= 200) return 3;
+      if (score >= 100) return 2;
+      if (score >= 50) return 1;
+      return 0;
+    }
+
+    function updateDevilStage() {
       const newStage = computeDevilStageFromScore(score);
       if (newStage > devilStage) {
         prevDevilStage = devilStage;
