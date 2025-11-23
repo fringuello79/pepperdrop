@@ -6,10 +6,8 @@
   <title>Pepper Drop – Bocca di Fuoco</title>
   <style>
     html, body {
-      height: 100%;
       margin: 0;
       padding: 0;
-      overflow: hidden; /* niente scroll durante il gioco */
     }
 
     body {
@@ -20,8 +18,8 @@
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      height: 100vh;
       padding-top: 10px;
+      min-height: 100vh;
     }
 
     .top-bar {
@@ -65,7 +63,7 @@
       border: 3px solid #555;
       image-rendering: pixelated;
       background: #000;
-      touch-action: none; /* per evitare scroll su mobile */
+      touch-action: none; /* per evitare scroll su mobile quando giochi */
     }
 
     #hud {
@@ -102,7 +100,7 @@
       background: #333;
     }
 
-    /* Controlli mobile grandi in basso – SEMPRE visibili */
+    /* Controlli mobile grandi in basso – sempre visibili */
     .mobile-controls {
       margin-top: 6px;
       width: 480px;
@@ -113,24 +111,31 @@
 
     .mobile-btn {
       flex: 1;
-      padding: 14px 0;
-      background: #222;
-      border: 1px solid #777;
-      color: #f5f5f5;
+      padding: 18px 0;                 /* più alti */
+      background: linear-gradient(#550000, #220000);
+      border: 2px solid #aa0000;
+      color: #ff4444;                   /* frecce rosse */
       text-align: center;
-      font-size: 20px;
+      font-size: 24px;
+      font-weight: bold;
       user-select: none;
       -webkit-user-select: none;
+      border-radius: 10px;              /* angoli arrotondati */
+      box-shadow: 0 3px 0 #440000;      /* effetto 3D */
+      transition: transform 0.05s, box-shadow 0.05s, background 0.1s;
     }
 
     .mobile-btn:active {
-      background: #333;
+      background: linear-gradient(#660000, #330000);
+      box-shadow: 0 1px 0 #220000;
+      transform: translateY(2px);
     }
 
     #leaderboard {
       margin-top: 10px;
       font-size: 11px;
       width: 480px;
+      margin-bottom: 16px;
     }
 
     #leaderboard h2 {
@@ -528,7 +533,6 @@
       const gain = audioCtx.createGain();
 
       osc.type = "square";
-
       osc.frequency.setValueAtTime(440, now);
       osc.frequency.setValueAtTime(587, now + 0.12);
       osc.frequency.setValueAtTime(659, now + 0.24);
@@ -643,7 +647,7 @@
       if (e.key === "ArrowRight") keys.right = false;
     });
 
-    // Controlli touch sul canvas (restano, ma ora hai anche i tasti in basso)
+    // Touch sul canvas
     function handleTouch(e) {
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
@@ -671,7 +675,7 @@
     canvas.addEventListener("touchend", endTouch, { passive: false });
     canvas.addEventListener("touchcancel", endTouch, { passive: false });
 
-    // Controlli mobile dedicati (tastoni)
+    // Controlli mobile (tasti in basso)
     function pressLeft(e) {
       e.preventDefault();
       keys.left = true;
@@ -704,7 +708,7 @@
       btnRight.addEventListener("touchend", releaseRight, { passive: false });
       btnRight.addEventListener("touchcancel", releaseRight, { passive: false });
 
-      // mouse (per chi gioca da desktop)
+      // mouse
       btnLeft.addEventListener("mousedown", pressLeft);
       btnLeft.addEventListener("mouseup", releaseLeft);
       btnLeft.addEventListener("mouseleave", releaseLeft);
@@ -731,6 +735,8 @@
       gameStarted = true;
       btnStart.style.display = "none";
       restartGame();
+      // assicuriamoci di vedere bene canvas + tasti
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
 
     function restartGame() {
@@ -887,7 +893,6 @@
         leafColor = "#34a35b";
       }
 
-      // sfondo piante
       for (let y = 0; y < HEIGHT; y += 16) {
         for (let x = 0; x < WIDTH; x += 16) {
           ctx.fillStyle = (x / 16 + y / 16) % 2 === 0 ? baseA : baseB;
@@ -900,7 +905,6 @@
         }
       }
 
-      // terreno sotto l'omino
       const groundHeight = 40;
       const groundY = HEIGHT - groundHeight;
       for (let y = groundY; y < HEIGHT; y += 8) {
@@ -917,21 +921,17 @@
         }
       }
 
-      // insegna "Orto San Pelino" con ombra e chiodini
       const boardWidth = 160;
       const boardHeight = 26;
       const boardX = WIDTH / 2 - boardWidth / 2;
       const boardY = 8;
 
-      // ombra sotto la tavola
       ctx.fillStyle = "rgba(0,0,0,0.4)";
       ctx.fillRect(boardX + 3, boardY + 4, boardWidth, boardHeight);
 
-      // tavola
       ctx.fillStyle = "#4a2f18";
       ctx.fillRect(boardX, boardY, boardWidth, boardHeight);
 
-      // venature
       ctx.strokeStyle = "#5c3a20";
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -941,7 +941,6 @@
       ctx.lineTo(boardX + boardWidth - 12, boardY + 20);
       ctx.stroke();
 
-      // chiodini ai lati
       ctx.fillStyle = "#d2c5aa";
       const nailSize = 3;
       ctx.fillRect(boardX + 6, boardY + 5, nailSize, nailSize);
@@ -955,7 +954,6 @@
       ctx.fillRect(boardX + 6, boardY + boardHeight - 8, 1, 1);
       ctx.fillRect(boardX + boardWidth - 9, boardY + boardHeight - 8, 1, 1);
 
-      // testo centrato
       const text = "Orto San Pelino";
       ctx.font = "10px monospace";
       const textWidth = ctx.measureText(text).width;
@@ -968,7 +966,6 @@
       ctx.globalAlpha = 1.0;
     }
 
-    // --- OMINO stile "figlio" ---
     function drawPlayer() {
       const exploding = gameOver && lastDeathByReaper;
 
@@ -983,11 +980,10 @@
         ctx.translate(-cx, -cy);
       }
 
-      // PALETTE
-      const shirtMain  = "#ffffff";   // maglietta bianca
+      const shirtMain  = "#ffffff";
       const shirtShadow = "#d0d0d0";
       const pants      = "#404553";
-      const hairMain   = "#4b3726";   // castano scuro
+      const hairMain   = "#4b3726";
       const hairLight  = "#6b4931";
 
       let skinBase;
@@ -1005,69 +1001,56 @@
       const offset = Math.sin(player.armPhase) * amp;
       const legOffset = player.moving ? Math.sin(player.armPhase + Math.PI / 2) * 1.5 : 0;
 
-      // Ombra sotto i piedi
       ctx.fillStyle = "rgba(0,0,0,0.4)";
       ctx.fillRect(player.x + 4, player.y + 38 + legOffset, player.w - 8, 3);
 
-      // GAMBE
       ctx.fillStyle = pants;
       ctx.fillRect(player.x + 7, player.y + 26 + legOffset, player.w - 14, 8);
       ctx.fillStyle = "#292c37";
       ctx.fillRect(player.x + 6, player.y + 26 + legOffset, 1, 8);
       ctx.fillRect(player.x + player.w - 7, player.y + 26 + legOffset, 1, 8);
 
-      // Piedi
       ctx.fillStyle = "#141414";
       ctx.fillRect(player.x + 5, player.y + 34 + legOffset, 8, 3);
       ctx.fillRect(player.x + player.w - 13, player.y + 34 + legOffset, 8, 3);
 
-      // BUSTO
       ctx.fillStyle = shirtMain;
       ctx.fillRect(player.x + 4, player.y + 14, player.w - 8, 12);
       ctx.fillStyle = shirtShadow;
       ctx.fillRect(player.x + 4, player.y + 22, player.w - 8, 2);
 
-      // Collo
       ctx.fillStyle = skinBase;
       ctx.fillRect(player.x + 9, player.y + 10, 8, 4);
 
-      // TESTA
       ctx.fillStyle = skinBase;
-      ctx.fillRect(player.x + 4, player.y,     player.w - 8, 4); // fronte
-      ctx.fillRect(player.x + 3, player.y + 3, player.w - 6, 5); // centro
-      ctx.fillRect(player.x + 4, player.y + 8, player.w - 8, 3); // guance
+      ctx.fillRect(player.x + 4, player.y,     player.w - 8, 4);
+      ctx.fillRect(player.x + 3, player.y + 3, player.w - 6, 5);
+      ctx.fillRect(player.x + 4, player.y + 8, player.w - 8, 3);
 
-      // ombra lato dx
       ctx.fillStyle = "rgba(0,0,0,0.18)";
       ctx.fillRect(player.x + player.w - 5, player.y + 3, 2, 8);
 
-      // highlight fronte
       ctx.fillStyle = "rgba(255,255,255,0.18)";
       ctx.fillRect(player.x + 5, player.y + 1, 4, 2);
 
-      // guance rosate
       ctx.fillStyle = "rgba(240,140,140,0.5)";
       ctx.fillRect(player.x + 5, player.y + 7, 3, 2);
       ctx.fillRect(player.x + player.w - 8, player.y + 7, 3, 2);
 
-      // contorno testa
       ctx.fillStyle = "#3b2216";
       ctx.fillRect(player.x + 3, player.y + 3, 1, 6);
       ctx.fillRect(player.x + player.w - 4, player.y + 3, 1, 6);
       ctx.fillRect(player.x + 4, player.y, player.w - 8, 1);
 
-      // CAPELLI "sparati"
       ctx.fillStyle = hairMain;
       ctx.fillRect(player.x + 3, player.y - 2, player.w - 6, 3);
       ctx.fillRect(player.x + 2, player.y - 1, player.w - 4, 3);
-      ctx.fillRect(player.x + 2, player.y - 4, 6, 2);      // ciuffo alto sx
+      ctx.fillRect(player.x + 2, player.y - 4, 6, 2);
       ctx.fillRect(player.x + 3, player.y - 5, 4, 1);
-      ctx.fillRect(player.x + player.w - 8, player.y - 3, 4, 2); // volume dx
-
+      ctx.fillRect(player.x + player.w - 8, player.y - 3, 4, 2);
       ctx.fillStyle = hairLight;
       ctx.fillRect(player.x + 5, player.y - 1, player.w - 12, 1);
 
-      // OCCHI grandi
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(player.x + 7, player.y + 3, 3, 2);
       ctx.fillRect(player.x + player.w - 10, player.y + 3, 3, 2);
@@ -1076,16 +1059,13 @@
       ctx.fillRect(player.x + 8, player.y + 3, 1, 1);
       ctx.fillRect(player.x + player.w - 9, player.y + 3, 1, 1);
 
-      // sopracciglia
       ctx.fillStyle = "#2b1a10";
       ctx.fillRect(player.x + 7, player.y + 2, 3, 1);
       ctx.fillRect(player.x + player.w - 10, player.y + 2, 3, 1);
 
-      // naso
       ctx.fillStyle = "#b5775a";
       ctx.fillRect(player.x + player.w / 2 - 1, player.y + 5, 2, 1);
 
-      // BOCCA
       const mouthWidth = player.w - 12;
       const mouthX = player.x + (player.w - mouthWidth) / 2;
 
@@ -1100,7 +1080,6 @@
       ctx.fillStyle = "#aa3333";
       ctx.fillRect(mouthX + 2, player.y + 11, mouthWidth - 4, 2);
 
-      // CORNA
       if (devilStage >= 2) {
         ctx.fillStyle = devilStage === 2 ? "#f5f5f5" : "#ffeb3b";
         ctx.fillRect(player.x + 5, player.y - 3, 2, 3);
@@ -1109,12 +1088,10 @@
         ctx.fillRect(player.x + player.w - 7, player.y - 5, 1, 2);
       }
 
-      // BRACCIA
       ctx.fillStyle = skinBase;
       ctx.fillRect(player.x - 3, player.y + 16 + offset, 3, 10);
       ctx.fillRect(player.x + player.w, player.y + 16 - offset, 3, 10);
 
-      // ESPLOSIONE grafica dalla bocca
       if (exploding) {
         ctx.fillStyle = "#ffbf00";
         ctx.fillRect(mouthX + mouthWidth, player.y + 9, 8, 5);
@@ -1244,7 +1221,6 @@
     }
 
     function draw() {
-      // SHAKE dello schermo quando muori per Reaper
       ctx.save();
       if (gameOver && lastDeathByReaper) {
         const intensity = Math.max(0, 8 - explosionFrame * 0.4);
