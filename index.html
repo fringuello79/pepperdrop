@@ -620,57 +620,55 @@
         });
     }
 
-async function onGameOver() {
-  let msgPrompt;
-  if (score === 0) {
-    msgPrompt = "GAME OVER! Hai preso zero. Vuoi davvero finire in classifica? 😬";
-  } else if (score < 10) {
-    msgPrompt = "GAME OVER! Piccantezza da principiante. Inserisci comunque il tuo nome:";
-  } else if (score < 30) {
-    msgPrompt = "GAME OVER! Niente male, ma le papille sono ancora vive. Nome per la classifica?";
-  } else {
-    msgPrompt = "GAME OVER! Onorevole rogo. Firma l'impresa:";
-  }
+    async function onGameOver() {
+      let msgPrompt;
+      if (score === 0) {
+        msgPrompt = "GAME OVER! Hai preso zero. Vuoi davvero finire in classifica? 😬";
+      } else if (score < 10) {
+        msgPrompt = "GAME OVER! Piccantezza da principiante. Inserisci comunque il tuo nome:";
+      } else if (score < 30) {
+        msgPrompt = "GAME OVER! Niente male, ma le papille sono ancora vive. Nome per la classifica?";
+      } else {
+        msgPrompt = "GAME OVER! Onorevole rogo. Firma l'impresa:";
+      }
 
-  let name = prompt(msgPrompt, "");
-  if (name) {
-    name = name.trim();
-  }
-  if (!name) {
-    name = "si vergogna di inserire il nome";
-  }
+      let name = prompt(msgPrompt, "");
+      if (name) {
+        name = name.trim();
+      }
+      if (!name) {
+        name = "si vergogna di inserire il nome";
+      }
 
-  // aggiorna classifica locale
-  leaderboard.push({ name, score });
-  leaderboard.sort((a, b) => b.score - a.score);
-  leaderboard = leaderboard.slice(0, 10);
+      // aggiorno subito la leaderboard in memoria
+      leaderboard.push({ name, score });
+      leaderboard.sort((a, b) => b.score - a.score);
+      leaderboard = leaderboard.slice(0, 10);
 
-  try {
-    localStorage.setItem("pepperDropLeaderboard", JSON.stringify(leaderboard));
-  } catch (e) {}
+      // cache locale
+      try {
+        localStorage.setItem("pepperDropLeaderboard", JSON.stringify(leaderboard));
+      } catch (e) {}
 
-  renderLeaderboard();
+      renderLeaderboard();
 
-  // INVIO al Google Apps Script come form POST (name, score)
-  try {
-    const body = new URLSearchParams();
-    body.append("name", name);
-    body.append("score", String(score));
+      // invio al server condiviso
+     // invio al server condiviso (come form, compatibile con e.parameter)
+try {
+  const body = new URLSearchParams();
+  body.append("name", name);
+  body.append("score", String(score));
 
-    await fetch(API_URL, {
-      method: "POST",
-      body
-      // niente headers personalizzati → niente problemi di CORS / preflight
-    });
+  await fetch(API_URL, {
+    method: "POST",
+    body
+  });
 
-    console.log("Punteggio inviato all'API");
-  } catch (err) {
-    console.error("Errore nell'invio del punteggio all'API:", err);
-  }
-
-  // poi ricarichiamo la leaderboard dal server
-  loadLeaderboard();
+  console.log("Punteggio inviato all'API");
+} catch (err) {
+  console.error("Errore nell'invio del punteggio all'API:", err);
 }
+
 
     // --- INPUT & GIOCO ---
 
