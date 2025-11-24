@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -82,6 +81,9 @@
       font-size: 12px;
       margin-top: 8px;
       text-align: center;
+      line-height: 1.3;
+      height: 48px;          /* altezza fissa per non spostare i tasti */
+      overflow: hidden;      /* nasconde eventuali righe extra */
     }
 
     .highlight {
@@ -361,7 +363,7 @@
     </div>
 
     <div id="leaderboard">
-      <h2>Classifica Orto San Pelino</h2>
+      <h2>Hall of flame</h2>
       <ol id="leaderboardList"></ol>
       <p id="leaderboardNote">
         Se non sei in lista, probabilmente bevi ancora il latte senza peperoncino.
@@ -384,6 +386,12 @@
 
     const WIDTH = canvas.width;
     const HEIGHT = canvas.height;
+
+    // immagine di sfondo (campo pixel art)
+    const bgImg = new Image();
+    bgImg.src = "sfondo.jpg";
+    let bgLoaded = false;
+    bgImg.onload = () => { bgLoaded = true; };
 
     // URL Apps Script per leaderboard globale
     const API_URL = "https://script.google.com/macros/s/AKfycbwAvfJ4np-AoiM-ibDa2rn-aNtEnXGDj70kV6gQ5vFFfoHH9wYD_ujYmDob7wfdwK2rxA/exec";
@@ -619,7 +627,6 @@
         });
     }
 
-    // <<< FUNZIONE GAME OVER CORRETTA >>>
     async function onGameOver() {
       let msgPrompt;
       if (score === 0) {
@@ -640,19 +647,16 @@
         name = "si vergogna di inserire il nome";
       }
 
-      // aggiorno subito leaderboard in memoria
       leaderboard.push({ name, score });
       leaderboard.sort((a, b) => b.score - a.score);
       leaderboard = leaderboard.slice(0, 10);
 
-      // cache locale
       try {
         localStorage.setItem("pepperDropLeaderboard", JSON.stringify(leaderboard));
       } catch (e) {}
 
       renderLeaderboard();
 
-      // invio al server condiviso (form compatibile con Apps Script)
       try {
         const body = new URLSearchParams();
         body.append("name", name);
@@ -668,10 +672,8 @@
         console.error("Errore nell'invio del punteggio all'API:", err);
       }
 
-      // ricarico leaderboard dal server (così vedono tutte le partite)
       loadLeaderboard();
     }
-    // >>> FINE onGameOver <<<
 
     // --- INPUT & GIOCO ---
 
@@ -912,55 +914,15 @@
     }
 
     function drawBackground() {
-      const level = getLevel();
-      let baseA, baseB, leafColor;
-
-      if (level === 0) {
-        baseA = "#063522";
-        baseB = "#0a4228";
-        leafColor = "#1b6a38";
-      } else if (level === 1) {
-        baseA = "#08412a";
-        baseB = "#0c5132";
-        leafColor = "#207743";
-      } else if (level === 2) {
-        baseA = "#0a4a2f";
-        baseB = "#105b37";
-        leafColor = "#2a8c4f";
+      // sfondo con immagine
+      if (bgLoaded) {
+        ctx.drawImage(bgImg, 0, 0, WIDTH, HEIGHT);
       } else {
-        baseA = "#0b5a36";
-        baseB = "#146b3e";
-        leafColor = "#34a35b";
+        ctx.fillStyle = "#146b3e";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
       }
 
-      for (let y = 0; y < HEIGHT; y += 16) {
-        for (let x = 0; x < WIDTH; x += 16) {
-          ctx.fillStyle = (x / 16 + y / 16) % 2 === 0 ? baseA : baseB;
-          ctx.fillRect(x, y, 16, 16);
-
-          ctx.fillStyle = leafColor;
-          ctx.fillRect(x + 6, y + 4, 2, 8);
-          ctx.fillRect(x + 3, y + 6, 3, 3);
-          ctx.fillRect(x + 8, y + 6, 3, 3);
-        }
-      }
-
-      const groundHeight = 40;
-      const groundY = HEIGHT - groundHeight;
-      for (let y = groundY; y < HEIGHT; y += 8) {
-        for (let x = 0; x < WIDTH; x += 8) {
-          const toggle = (x / 8 + y / 8) % 2 === 0;
-          ctx.fillStyle = toggle ? "#8f877c" : "#7f776d";
-          ctx.fillRect(x, y, 8, 8);
-
-          if (toggle) {
-            ctx.fillStyle = "#a49c91";
-            ctx.fillRect(x + 2, y + 2, 1, 1);
-            ctx.fillRect(x + 5, y + 4, 1, 1);
-          }
-        }
-      }
-
+      // insegna "Orto San Pelino"
       const boardWidth = 160;
       const boardHeight = 26;
       const boardX = WIDTH / 2 - boardWidth / 2;
