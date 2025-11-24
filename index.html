@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -45,17 +46,17 @@
     }
 
     .title-main {
-      color: #ff3b3b; /* rosso fuoco */
+      color: #ff3b3b;
     }
 
     .title-sub {
       font-size: 10px;
       margin-left: 6px;
-      color: rgba(255, 255, 255, 0.25); /* appena visibile */
+      color: rgba(255, 255, 255, 0.25);
     }
 
     .logo {
-      height: 60px; /* dimensione B, piccola */
+      height: 60px;
     }
 
     #info {
@@ -420,7 +421,7 @@
 
     let audioCtx = null;
 
-    // nuovo: timer per "bocca chiusa"
+    // timer per "bocca chiusa"
     let chewTimer = 0;
 
     function initAudio() {
@@ -584,15 +585,13 @@
     // --- LEADERBOARD REMOTA ---
 
     async function loadLeaderboard() {
-      // Provo prima a prendere i dati dall'API condivisa
       try {
         const res = await fetch(API_URL);
         if (!res.ok) throw new Error("HTTP " + res.status);
-        const data = await res.json(); // [{name, score}, ...]
+        const data = await res.json();
         leaderboard = Array.isArray(data) ? data : [];
       } catch (err) {
         console.error("Errore leaderboard remota, uso eventuale cache locale:", err);
-        // fallback: classifica locale sul singolo browser
         try {
           const local = localStorage.getItem("pepperDropLeaderboard");
           leaderboard = local ? JSON.parse(local) : [];
@@ -620,6 +619,7 @@
         });
     }
 
+    // <<< FUNZIONE GAME OVER CORRETTA >>>
     async function onGameOver() {
       let msgPrompt;
       if (score === 0) {
@@ -640,7 +640,7 @@
         name = "si vergogna di inserire il nome";
       }
 
-      // aggiorno subito la leaderboard in memoria
+      // aggiorno subito leaderboard in memoria
       leaderboard.push({ name, score });
       leaderboard.sort((a, b) => b.score - a.score);
       leaderboard = leaderboard.slice(0, 10);
@@ -652,20 +652,26 @@
 
       renderLeaderboard();
 
-      // invio al server condiviso
+      // invio al server condiviso (form compatibile con Apps Script)
       try {
+        const body = new URLSearchParams();
+        body.append("name", name);
+        body.append("score", String(score));
+
         await fetch(API_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, score })
+          body
         });
+
+        console.log("Punteggio inviato all'API");
       } catch (err) {
         console.error("Errore nell'invio del punteggio all'API:", err);
       }
 
-      // ricarico la leaderboard dal server (aggiornata)
+      // ricarico leaderboard dal server (così vedono tutte le partite)
       loadLeaderboard();
     }
+    // >>> FINE onGameOver <<<
 
     // --- INPUT & GIOCO ---
 
@@ -1103,7 +1109,6 @@
       const mouthWidth = player.w - 12;
       const mouthX = player.x + (player.w - mouthWidth) / 2;
 
-      // BOCCA: aperta normalmente, chiusa se chewTimer > 0
       if (chewTimer > 0 && !exploding) {
         ctx.fillStyle = "#330000";
         ctx.fillRect(mouthX, player.y + 10, mouthWidth, 2);
@@ -1396,7 +1401,7 @@
                 score += 1;
                 playEatSound();
               }
-              chewTimer = 8; // chiude la bocca per qualche frame
+              chewTimer = 8;
               updateDevilStage();
               updateHUD();
               objects.splice(i, 1);
