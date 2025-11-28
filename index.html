@@ -27,6 +27,7 @@
       max-width: 480px;
       padding: 0 8px 16px;
       box-sizing: border-box;
+      position: relative;
     }
 
     .top-bar {
@@ -35,6 +36,7 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 4px;
+      position: relative;
     }
 
     .top-bar h1 {
@@ -82,8 +84,8 @@
       margin-top: 8px;
       text-align: center;
       line-height: 1.3;
-      height: 48px;          /* altezza fissa per non spostare i tasti */
-      overflow: hidden;      /* nasconde eventuali righe extra */
+      height: 48px;
+      overflow: hidden;
     }
 
     .highlight {
@@ -321,6 +323,72 @@
       height: 3px;
       background: #bbdefb;
     }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .overlay.hidden {
+      display: none;
+    }
+
+    .overlay-box {
+      background: #111;
+      border: 1px solid #555;
+      padding: 10px 12px;
+      max-width: 280px;
+      font-size: 12px;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+    }
+
+    .overlay-box p {
+      margin: 4px 0;
+    }
+
+    #finalScoreDisplay {
+      font-weight: bold;
+      color: #ff4444;
+    }
+
+    #nameInput {
+      width: 100%;
+      margin-top: 6px;
+      padding: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      box-sizing: border-box;
+      background: #222;
+      border: 1px solid #666;
+      color: #f5f5f5;
+    }
+
+    .overlay-buttons {
+      margin-top: 8px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .overlay-buttons button {
+      padding: 3px 8px;
+      background: #222;
+      border: 1px solid #777;
+      color: #f5f5f5;
+      font-family: monospace;
+      font-size: 11px;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
+
+    .overlay-buttons button:hover {
+      background: #333;
+    }
   </style>
 </head>
 <body>
@@ -334,10 +402,10 @@
     </div>
 
     <div id="info">
-      Muovi l'omino con <span class="highlight">← →</span> o toccando la metà sinistra/destra dello schermo.<br>
-      Mangia i peperoncini buoni = 
-      <span class="icon-pepper icon-hab-red"></span> Habanero Red e
+      Muovi l'omino con <span class="highlight">← →</span>.<br>
+      Mangia i peperoncini buoni =<br>
       <span class="icon-pepper icon-hab-orange"></span> Habanero Orange: <strong>+1 punto</strong>.<br>
+      <span class="icon-pepper icon-hab-red"></span> Habanero Red: <strong>+1 punto</strong>.<br>
       <span class="icon-pepper icon-scorpion-yellow"></span> Scorpion Yellow: <strong>+2 punti</strong>.<br>
       <span class="icon-pepper icon-hab-choc"></span> Habanero Chocolate: <strong>+3 punti</strong>.<br>
       <span class="icon-pepper icon-reaper"></span> Carolina Reaper: <strong>GAME OVER</strong>.<br>
@@ -347,8 +415,6 @@
     <canvas id="game" width="480" height="320"></canvas>
 
     <div id="hud">
-      Punteggio: <span id="score">0</span> –
-      Latte salvavita: <span id="milkCount">0</span><br>
       <span id="status"></span>
     </div>
 
@@ -371,12 +437,25 @@
     </div>
   </div>
 
+  <div id="nameOverlay" class="overlay hidden">
+    <div class="overlay-box">
+      <p id="nameMessage"></p>
+      <p>Punteggio raggiunto: <strong id="finalScoreDisplay">0</strong></p>
+      <input id="nameInput" type="text" placeholder="Inserisci il tuo nome (o soprannome)">
+      <div class="overlay-buttons">
+        <button id="nameSkip">Salta</button>
+        <button id="nameOk">OK</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // ATTENZIONE: revisione corrente del gioco
+    const GAME_REVISION = "9.7";
+
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
 
-    const scoreEl = document.getElementById("score");
-    const milkCountEl = document.getElementById("milkCount");
     const statusEl = document.getElementById("status");
     const btnStart = document.getElementById("btnStart");
     const btnRestart = document.getElementById("btnRestart");
@@ -384,16 +463,21 @@
     const btnLeft = document.getElementById("btnLeft");
     const btnRight = document.getElementById("btnRight");
 
+    const nameOverlay = document.getElementById("nameOverlay");
+    const nameMessageEl = document.getElementById("nameMessage");
+    const finalScoreDisplay = document.getElementById("finalScoreDisplay");
+    const nameInput = document.getElementById("nameInput");
+    const nameOk = document.getElementById("nameOk");
+    const nameSkip = document.getElementById("nameSkip");
+
     const WIDTH = canvas.width;
     const HEIGHT = canvas.height;
 
-    // immagine di sfondo (campo pixel art)
     const bgImg = new Image();
     bgImg.src = "sfondo.jpg";
     let bgLoaded = false;
     bgImg.onload = () => { bgLoaded = true; };
 
-    // URL Apps Script per leaderboard globale
     const API_URL = "https://script.google.com/macros/s/AKfycbwAvfJ4np-AoiM-ibDa2rn-aNtEnXGDj70kV6gQ5vFFfoHH9wYD_ujYmDob7wfdwK2rxA/exec";
 
     let gameStarted = false;
@@ -428,8 +512,6 @@
     let pendingNamePrompt = false;
 
     let audioCtx = null;
-
-    // timer per "bocca chiusa"
     let chewTimer = 0;
 
     function initAudio() {
@@ -440,7 +522,17 @@
         } catch (e) {
           audioCtx = null;
         }
+      } else if (audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
       }
+    }
+
+    function safePlay(fn) {
+      if (!audioCtx) return;
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
+      }
+      fn();
     }
 
     function playEatSound() {
@@ -590,8 +682,6 @@
     window.addEventListener("keydown", initAudio, { once: true });
     canvas.addEventListener("touchstart", initAudio, { once: true });
 
-    // --- LEADERBOARD REMOTA ---
-
     async function loadLeaderboard() {
       try {
         const res = await fetch(API_URL);
@@ -617,14 +707,44 @@
         .slice(0, 10)
         .forEach((entry, index) => {
           const li = document.createElement("li");
-          if (index === 0) {
-            li.className = "lb-first";
-          } else {
-            li.className = "lb-normal";
-          }
+          li.className = index === 0 ? "lb-first" : "lb-normal";
           li.textContent = `${entry.name}: ${entry.score}`;
           leaderboardList.appendChild(li);
         });
+    }
+
+    function askPlayerName(message) {
+      return new Promise((resolve) => {
+        nameMessageEl.textContent = message;
+        finalScoreDisplay.textContent = String(score);
+        nameInput.value = "";
+        nameOverlay.classList.remove("hidden");
+        setTimeout(() => {
+          nameInput.focus();
+        }, 50);
+
+        function finish(name) {
+          nameOverlay.classList.add("hidden");
+          nameOk.onclick = null;
+          nameSkip.onclick = null;
+          nameInput.onkeydown = null;
+          resolve(name);
+        }
+
+        nameOk.onclick = () => {
+          finish(nameInput.value.trim());
+        };
+
+        nameSkip.onclick = () => {
+          finish("");
+        };
+
+        nameInput.onkeydown = (e) => {
+          if (e.key === "Enter") {
+            finish(nameInput.value.trim());
+          }
+        };
+      });
     }
 
     async function onGameOver() {
@@ -639,7 +759,7 @@
         msgPrompt = "GAME OVER! Onorevole rogo. Firma l'impresa:";
       }
 
-      let name = prompt(msgPrompt, "");
+      let name = await askPlayerName(msgPrompt);
       if (name) {
         name = name.trim();
       }
@@ -666,8 +786,6 @@
           method: "POST",
           body
         });
-
-        console.log("Punteggio inviato all'API");
       } catch (err) {
         console.error("Errore nell'invio del punteggio all'API:", err);
       }
@@ -675,14 +793,13 @@
       loadLeaderboard();
     }
 
-    // --- INPUT & GIOCO ---
-
     window.addEventListener("keydown", (e) => {
       if (e.key === "ArrowLeft") keys.left = true;
       if (e.key === "ArrowRight") keys.right = true;
 
       if (gameOver && e.key === " ") {
-        if (audioCtx) playStartMusic();
+        initAudio();
+        safePlay(playStartMusic);
         restartGame();
       }
     });
@@ -761,7 +878,8 @@
 
     btnRestart.addEventListener("click", () => {
       if (!gameStarted) return;
-      if (audioCtx) playStartMusic();
+      initAudio();
+      safePlay(playStartMusic);
       restartGame();
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
@@ -769,10 +887,10 @@
     btnStart.addEventListener("click", () => {
       initAudio();
       if (!hasPlayedIntro && audioCtx) {
-        playStartMusic();
+        safePlay(playStartMusic);
         hasPlayedIntro = true;
       } else if (audioCtx) {
-        playStartMusic();
+        safePlay(playStartMusic);
       }
       gameStarted = true;
       btnStart.style.display = "none";
@@ -859,13 +977,6 @@
       );
     }
 
-    function getLevel() {
-      if (score < 5) return 0;
-      if (score < 10) return 1;
-      if (score < 20) return 2;
-      return 3;
-    }
-
     function computeDevilStageFromScore(score) {
       if (score >= 200) return 3;
       if (score >= 100) return 2;
@@ -878,7 +989,7 @@
       if (newStage > devilStage) {
         prevDevilStage = devilStage;
         devilStage = newStage;
-        playLevelChangeSound();
+        safePlay(playLevelChangeSound);
         if (devilStage === 2) {
           statusEl.textContent = "Modalità diavoletto attiva 😈 – complimenti, ora sei tu il problema.";
         } else if (devilStage === 3) {
@@ -888,9 +999,6 @@
     }
 
     function updateHUD() {
-      scoreEl.textContent = score;
-      milkCountEl.textContent = milkShields;
-
       if (!gameOver) {
         if (
           (devilStage === 2 && statusEl.textContent.includes("diavoletto")) ||
@@ -914,7 +1022,6 @@
     }
 
     function drawBackground() {
-      // sfondo con immagine
       if (bgLoaded) {
         ctx.drawImage(bgImg, 0, 0, WIDTH, HEIGHT);
       } else {
@@ -922,7 +1029,6 @@
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
       }
 
-      // insegna "Orto San Pelino"
       const boardWidth = 160;
       const boardHeight = 26;
       const boardX = WIDTH / 2 - boardWidth / 2;
@@ -984,7 +1090,9 @@
 
       const shirtMain  = "#ffffff";
       const shirtShadow = "#d0d0d0";
+      const shirtHighlight = "rgba(255,255,255,0.18)";
       const pants      = "#404553";
+      const pantsShadow = "#292c37";
       const hairMain   = "#4b3726";
       const hairLight  = "#6b4931";
 
@@ -1003,47 +1111,87 @@
       const offset = Math.sin(player.armPhase) * amp;
       const legOffset = player.moving ? Math.sin(player.armPhase + Math.PI / 2) * 1.5 : 0;
 
+      // ombra
       ctx.fillStyle = "rgba(0,0,0,0.4)";
       ctx.fillRect(player.x + 4, player.y + 38 + legOffset, player.w - 8, 3);
 
+      // pantaloni
       ctx.fillStyle = pants;
       ctx.fillRect(player.x + 7, player.y + 26 + legOffset, player.w - 14, 8);
-      ctx.fillStyle = "#292c37";
+      ctx.fillStyle = pantsShadow;
       ctx.fillRect(player.x + 6, player.y + 26 + legOffset, 1, 8);
       ctx.fillRect(player.x + player.w - 7, player.y + 26 + legOffset, 1, 8);
 
+      // pieghe pantaloni
+      ctx.fillStyle = "rgba(0,0,0,0.3)";
+      ctx.fillRect(player.x + 10, player.y + 28 + legOffset, 1, 3);
+      ctx.fillRect(player.x + player.w - 11, player.y + 29 + legOffset, 1, 3);
+
+      // ginocchia
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      ctx.fillRect(player.x + 9, player.y + 27 + legOffset, 2, 1);
+      ctx.fillRect(player.x + player.w - 11, player.y + 27 + legOffset, 2, 1);
+
+      // scarpe
       ctx.fillStyle = "#141414";
       ctx.fillRect(player.x + 5, player.y + 34 + legOffset, 8, 3);
       ctx.fillRect(player.x + player.w - 13, player.y + 34 + legOffset, 8, 3);
 
+      // lacci
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillRect(player.x + 6, player.y + 35 + legOffset, 3, 1);
+      ctx.fillRect(player.x + player.w - 11, player.y + 35 + legOffset, 3, 1);
+
+      // maglia
       ctx.fillStyle = shirtMain;
       ctx.fillRect(player.x + 4, player.y + 14, player.w - 8, 12);
       ctx.fillStyle = shirtShadow;
       ctx.fillRect(player.x + 4, player.y + 22, player.w - 8, 2);
+      ctx.fillStyle = shirtHighlight;
+      ctx.fillRect(player.x + 5, player.y + 16, player.w - 10, 1);
 
+      // piega centrale
+      ctx.fillStyle = "rgba(0,0,0,0.3)";
+      ctx.fillRect(player.x + player.w / 2, player.y + 15, 1, 8);
+
+      // ombra laterale maglia
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      ctx.fillRect(player.x + player.w - 6, player.y + 15, 2, 10);
+
+      // collo
       ctx.fillStyle = skinBase;
       ctx.fillRect(player.x + 9, player.y + 10, 8, 4);
 
+      // testa
       ctx.fillStyle = skinBase;
       ctx.fillRect(player.x + 4, player.y,     player.w - 8, 4);
       ctx.fillRect(player.x + 3, player.y + 3, player.w - 6, 5);
       ctx.fillRect(player.x + 4, player.y + 8, player.w - 8, 3);
 
+      // orecchie
+      ctx.fillRect(player.x + 2, player.y + 4, 1, 3);
+      ctx.fillRect(player.x + player.w - 3, player.y + 4, 1, 3);
+
+      // ombra viso
       ctx.fillStyle = "rgba(0,0,0,0.18)";
       ctx.fillRect(player.x + player.w - 5, player.y + 3, 2, 8);
 
+      // highlight viso
       ctx.fillStyle = "rgba(255,255,255,0.18)";
       ctx.fillRect(player.x + 5, player.y + 1, 4, 2);
 
+      // guance
       ctx.fillStyle = "rgba(240,140,140,0.5)";
       ctx.fillRect(player.x + 5, player.y + 7, 3, 2);
       ctx.fillRect(player.x + player.w - 8, player.y + 7, 3, 2);
 
+      // contorno viso
       ctx.fillStyle = "#3b2216";
       ctx.fillRect(player.x + 3, player.y + 3, 1, 6);
       ctx.fillRect(player.x + player.w - 4, player.y + 3, 1, 6);
       ctx.fillRect(player.x + 4, player.y, player.w - 8, 1);
 
+      // capelli
       ctx.fillStyle = hairMain;
       ctx.fillRect(player.x + 3, player.y - 2, player.w - 6, 3);
       ctx.fillRect(player.x + 2, player.y - 1, player.w - 4, 3);
@@ -1053,6 +1201,12 @@
       ctx.fillStyle = hairLight;
       ctx.fillRect(player.x + 5, player.y - 1, player.w - 12, 1);
 
+      // sopracciglia
+      ctx.fillStyle = "#2b1a10";
+      ctx.fillRect(player.x + 7, player.y + 2, 3, 1);
+      ctx.fillRect(player.x + player.w - 10, player.y + 2, 3, 1);
+
+      // occhi
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(player.x + 7, player.y + 3, 3, 2);
       ctx.fillRect(player.x + player.w - 10, player.y + 3, 3, 2);
@@ -1061,13 +1215,16 @@
       ctx.fillRect(player.x + 8, player.y + 3, 1, 1);
       ctx.fillRect(player.x + player.w - 9, player.y + 3, 1, 1);
 
-      ctx.fillStyle = "#2b1a10";
-      ctx.fillRect(player.x + 7, player.y + 2, 3, 1);
-      ctx.fillRect(player.x + player.w - 10, player.y + 2, 3, 1);
+      // stanchezza
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillRect(player.x + 7, player.y + 5, 3, 1);
+      ctx.fillRect(player.x + player.w - 10, player.y + 5, 3, 1);
 
+      // naso
       ctx.fillStyle = "#b5775a";
       ctx.fillRect(player.x + player.w / 2 - 1, player.y + 5, 2, 1);
 
+      // bocca
       const mouthWidth = player.w - 12;
       const mouthX = player.x + (player.w - mouthWidth) / 2;
 
@@ -1089,6 +1246,7 @@
         ctx.fillRect(mouthX + 2, player.y + 11, mouthWidth - 4, 2);
       }
 
+      // corna
       if (devilStage >= 2) {
         ctx.fillStyle = devilStage === 2 ? "#f5f5f5" : "#ffeb3b";
         ctx.fillRect(player.x + 5, player.y - 3, 2, 3);
@@ -1097,9 +1255,29 @@
         ctx.fillRect(player.x + player.w - 7, player.y - 5, 1, 2);
       }
 
+      // braccia + mani
+      const leftArmX = player.x - 3;
+      const rightArmX = player.x + player.w;
+      const armYBase = player.y + 16;
+
       ctx.fillStyle = skinBase;
-      ctx.fillRect(player.x - 3, player.y + 16 + offset, 3, 10);
-      ctx.fillRect(player.x + player.w, player.y + 16 - offset, 3, 10);
+      ctx.fillRect(leftArmX, armYBase + offset, 3, 6);
+      ctx.fillRect(rightArmX, armYBase - offset, 3, 6);
+
+      ctx.fillRect(leftArmX, armYBase + offset + 6, 3, 3);
+      ctx.fillRect(rightArmX, armYBase - offset + 6, 3, 3);
+
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.fillRect(leftArmX, armYBase + offset + 9, 3, 2);
+      ctx.fillRect(rightArmX, armYBase - offset + 9, 3, 2);
+
+      ctx.fillStyle = "rgba(255,255,255,0.2)";
+      ctx.fillRect(leftArmX, armYBase + offset, 2, 1);
+      ctx.fillRect(rightArmX + 1, armYBase - offset, 2, 1);
+
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillRect(player.x + 4, player.y + 14, 2, 2);
+      ctx.fillRect(player.x + player.w - 6, player.y + 14, 2, 2);
 
       if (exploding) {
         ctx.fillStyle = "#ffbf00";
@@ -1229,6 +1407,50 @@
       }
     }
 
+    function drawScoreAndMilkOnCanvas() {
+      ctx.font = "bold 10px monospace";
+
+      // Latte in alto a sinistra
+      const milkLabel = `Latte: ${milkShields}`;
+      const padding = 3;
+      const milkWidth = ctx.measureText(milkLabel).width + padding * 2;
+      const boxHeight = 14;
+      const milkX = 6;
+      const boxY = 4;
+
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(milkX, boxY, milkWidth, boxHeight);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(milkLabel, milkX + padding, boxY + 10);
+
+      // Punteggio in alto a destra
+      const scoreLabel = `P: ${score}`;
+      const scoreWidth = ctx.measureText(scoreLabel).width + padding * 2;
+      const scoreX = WIDTH - scoreWidth - 6;
+
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(scoreX, boxY, scoreWidth, boxHeight);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(scoreLabel, scoreX + padding, boxY + 10);
+    }
+
+    function drawFooterInfo() {
+      ctx.font = "8px monospace";
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+
+      const leftText = "PepperDrop";
+      const rightText = "rev " + GAME_REVISION;
+
+      const leftX = 10;
+      const baselineY = HEIGHT - 6;
+
+      ctx.fillText(leftText, leftX, baselineY);
+
+      const rightWidth = ctx.measureText(rightText).width;
+      const rightX = WIDTH - rightWidth - 10;
+      ctx.fillText(rightText, rightX, baselineY);
+    }
+
     function draw() {
       ctx.save();
       if (gameOver && lastDeathByReaper) {
@@ -1241,10 +1463,8 @@
       drawBackground();
       drawPlayer();
       drawObjects();
-
-      ctx.fillStyle = "#fff";
-      ctx.font = "10px monospace";
-      ctx.fillText("PepperAle – Seven Pocket 2025", 10, HEIGHT - 10);
+      drawScoreAndMilkOnCanvas();
+      drawFooterInfo();
 
       if (gameOver && gameStarted) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
@@ -1331,7 +1551,7 @@
               if (milkShields > 0) {
                 milkShields--;
                 statusEl.textContent = "Il latte ti salva dal peperoncino cattivo. Non farci l’abitudine. 🥛";
-                playMilkSound();
+                safePlay(playMilkSound);
                 updateHUD();
                 objects.splice(i, 1);
                 continue;
@@ -1341,27 +1561,27 @@
                 explosionFrame = 0;
                 pendingNamePrompt = true;
                 statusEl.textContent = "GAME OVER – Maestro Capsicum 1, tu 0. 😵‍💫";
-                playExplosionSound();
+                safePlay(playExplosionSound);
                 objects.splice(i, 1);
                 continue;
               }
             } else if (o.type === "milk") {
               milkShields++;
               statusEl.textContent = "Hai preso il latte. La tua dignità ringrazia in silenzio. 🥛";
-              playMilkSound();
+              safePlay(playMilkSound);
               updateHUD();
               objects.splice(i, 1);
               continue;
             } else {
               if (o.type === "scorpion_yellow") {
                 score += 2;
-                playEatYellowSound();
+                safePlay(playEatYellowSound);
               } else if (o.type === "habanero_choc") {
                 score += 3;
-                playEatChocolateSound();
+                safePlay(playEatChocolateSound);
               } else {
                 score += 1;
-                playEatSound();
+                safePlay(playEatSound);
               }
               chewTimer = 8;
               updateDevilStage();
